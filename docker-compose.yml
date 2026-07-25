@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  # ============================================================
+  # QuickBoot 应用服务
+  # 通过 Dockerfile 多阶段构建生成镜像
+  # ============================================================
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      # Redis 缓存开关（默认关闭，需启用 Redis 时改为 true 并取消下方 redis 服务注释）
+      - QUICKBOOT_REDIS_ENABLED=false
+      # Sa-Token 认证开关（默认关闭，需启用时改为 true）
+      # 注意：环境变量名用下划线，Spring Boot relaxed binding 会映射到 quickboot.sa-token.enabled
+      - QUICKBOOT_SA_TOKEN_ENABLED=false
+    # 如需启用 Redis，取消以下 depends_on 注释
+    # depends_on:
+    #   - redis
+    restart: unless-stopped
+
+  # ============================================================
+  # Redis 缓存服务（可选）
+  # 启用步骤：
+  #   1. 取消本服务注释
+  #   2. 将上方 app.environment 中 QUICKBOOT_REDIS_ENABLED 改为 true
+  #   3. 在 application-prod.yml 中配置 spring.redis.host=redis
+  #   4. 取消上方 app.depends_on 中 redis 的注释
+  # ============================================================
+  # redis:
+  #   image: redis:7-alpine
+  #   ports:
+  #     - "6379:6379"
+  #   restart: unless-stopped
+
+  # ============================================================
+  # MySQL 数据库（可选）
+  # 启用步骤：
+  #   1. 取消本服务注释
+  #   2. 在 application-prod.yml 中配置 spring.datasource 指向 mysql:3306
+  #   3. 按需调整下方环境变量中的 root 密码与库名
+  # ============================================================
+  # mysql:
+  #   image: mysql:8.0
+  #   ports:
+  #     - "3306:3306"
+  #   environment:
+  #     MYSQL_ROOT_PASSWORD: root
+  #     MYSQL_DATABASE: quickboot
+  #   restart: unless-stopped

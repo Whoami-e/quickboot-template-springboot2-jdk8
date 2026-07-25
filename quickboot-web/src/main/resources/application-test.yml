@@ -1,0 +1,6 @@
+# 测试环境配置（test）
+# 特征：日志收敛，业务包 INFO、框架包 WARN，兼顾可观测性与日志量
+logging:
+  level:
+    com.quickboot: INFO # 业务包日志级别 INFO
+    org.springframework: WARN # 框架日志收敛到 WARN，减少日志量

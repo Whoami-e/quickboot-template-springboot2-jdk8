@@ -1,0 +1,10 @@
+# 开发环境配置（dev）
+# 特征：开启懒加载以加速启动；业务包日志级别 DEBUG 便于排查问题
+spring:
+  main:
+    lazy-initialization: true # 懒加载：Bean 首次被使用时才初始化，缩短本地启动时间（注意：首请求会变慢，且启动期不再校验 Bean 完整性）
+
+logging:
+  level:
+    com.quickboot: DEBUG # 业务包详细日志，便于开发调试
+    org.springframework: INFO # 框架日志保持 INFO

@@ -1,0 +1,34 @@
+server:
+  port: 8080 # 服务端口
+
+spring:
+  profiles:
+    active: dev # 激活的运行环境（可选值：dev/test/prod），默认开发环境
+  application:
+    name: quickboot # 应用名称，用于日志、监控、服务发现标识
+
+# QuickBoot 特性开关：各功能模块均可独立开关，默认按需开启
+quickboot:
+  cors:
+    enabled: true # 是否启用跨域 CORS 配置（对应 CorsConfig），缺省 true
+    allowed-origins: "*" # 允许的源；"*" 表示全部（内部自动改用 allowedOriginPatterns 兼容凭证模式），也可配置逗号分隔的具体域名
+    allowed-methods: "GET,POST,PUT,DELETE,OPTIONS" # 允许的 HTTP 方法，逗号分隔
+  trace:
+    enabled: true # 是否启用链路追踪 TraceIdFilter（写入 MDC + 响应头），缺省 true
+  redis:
+    enabled: false # 是否启用 Redis（控制 RedisConfig 条件装配），缺省 false，按需开启
+  sa-token:
+    enabled: false # 是否启用 Sa-Token 鉴权（控制 SaTokenConfig/SaTokenExceptionHandler），缺省 false，按需开启
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss # 默认日期格式（JacksonConfig 已对 JSR-310 时间类型单独定制，此处供参考/覆盖）
+    time-zone: Asia/Shanghai # 统一时区
+
+# Actuator 监控端点配置
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics # 对外暴露的端点，按需调整；生产环境注意安全
+  endpoint:
+    health:
+      show-details: when-authorized # 健康详情展示策略：仅授权用户可见，避免泄漏内部组件状态

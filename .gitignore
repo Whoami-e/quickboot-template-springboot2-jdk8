@@ -1,0 +1,30 @@
+# Maven / build
+target/
+*.class
+*.jar
+*.war
+*.zip
+*.tar.gz
+dependency-reduced-pom.xml
+*.versionsBackup
+
+# IDE
+*.iml
+.idea/
+.project
+.classpath
+.settings/
+.factorypath
+
+# OS / editor
+.DS_Store
+*.swp
+*.orig
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# WorkBuddy workspace memory (not project source)
+.workbuddy/

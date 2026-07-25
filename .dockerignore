@@ -1,0 +1,23 @@
+# Git
+.git/
+.gitignore
+
+# IDE
+.idea/
+*.iml
+
+# 构建产物
+target/
+**/target/
+
+# 日志
+logs/
+**/logs/
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# 文档
+*.md
