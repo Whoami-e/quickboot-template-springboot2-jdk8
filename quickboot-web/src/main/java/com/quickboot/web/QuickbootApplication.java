@@ -15,6 +15,9 @@ import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
  * <ul>
  *   <li>{@link DataSourceAutoConfiguration} —— 排除数据源自动装配：模板默认不引入数据库依赖，
  *       避免启动时因找不到 DataSource 配置而报错；接入 MyBatis-Plus 时由 infrastructure 模块自行装配</li>
+ *   <li>MybatisPlusAutoConfiguration —— 排除 MyBatis-Plus 自动装配：与数据源排除联动，
+ *       避免在无数据库环境下因 SqlSessionFactory 初始化失败而报错；
+ *       由 {@code quickboot.mybatis-plus.enabled} 开关控制是否启用</li>
  *   <li>{@link RedisAutoConfiguration} —— 排除 Redis 自动装配：模板默认不强制依赖 Redis，
  *       由 quickboot.redis.enabled 开关控制是否启用，避免无 Redis 环境下启动失败</li>
  *   <li>{@link RedisRepositoriesAutoConfiguration} —— 排除 Redis 仓储自动装配：同上，
@@ -25,6 +28,7 @@ import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
         scanBasePackages = "com.quickboot",
         exclude = {
                 DataSourceAutoConfiguration.class,
+                com.baomidou.mybatisplus.autoconfigure.MybatisPlusAutoConfiguration.class,
                 RedisAutoConfiguration.class,
                 RedisRepositoriesAutoConfiguration.class
         }

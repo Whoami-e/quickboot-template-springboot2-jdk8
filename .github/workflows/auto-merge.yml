@@ -1,11 +1,12 @@
 name: auto-merge
 
-# 当目标分支为 master 的 PR 其 CI 检查（build）跑完且成功时，
-# 由 GitHub 原生 Auto-merge 自动合入 master，无需手动操作。
-# 关键：必须在 build 检查“已完成”后开启 auto-merge，
-# 检查进行中（unstable）时开启会被 GitHub 拒绝。
+# 由 CI 工作流“完成后”触发（workflow_run），而非 check_run：
+# GitHub 为防止递归，禁止“由 GitHub Actions 创建的 check run”再触发
+# check_run 监听的工作流 —— 所以原 check_run 方案永远不会被触发。
+# workflow_run 正是为此设计，且同样要求本工作流文件位于默认分支（master）。
 on:
-  check_run:
+  workflow_run:
+    workflows: ["CI"]
     types: [completed]
 
 permissions:
@@ -15,21 +16,25 @@ permissions:
 jobs:
   enable-auto-merge:
     runs-on: ubuntu-latest
-    if: >-
-      github.event.check_run.name == 'build' &&
-      github.event.check_run.conclusion == 'success'
+    if: github.event.workflow_run.conclusion == 'success'
     steps:
       - name: Enable auto-merge for PRs targeting master
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          prs='${{ toJson(github.event.check_run.check_suite.pull_requests) }}'
-          for num in $(echo "$prs" | python3 -c "import sys,json; print(' '.join(str(p['number']) for p in json.load(sys.stdin)))"); do
-            base=$(gh pr view "$num" --json baseRefName -q .baseRefName)
-            if [ "$base" = "master" ]; then
-              echo "Enabling auto-merge on PR #$num (base=master)"
-              gh pr merge --auto --merge "$num" || echo "auto-merge already enabled or skipped"
-            else
-              echo "PR #$num targets $base, skip"
-            fi
+          head="${{ github.event.workflow_run.head_branch }}"
+          echo "CI finished (success) for head branch: $head"
+          # 通过 gh 查询（而非 check_suite.pull_requests，后者常被置空），更可靠
+          for num in $(gh pr list --state open --head "$head" --base master --json number -q '.[].number'); do
+            echo "Enabling auto-merge on PR #$num (head=$head -> master)"
+            # 开启 GitHub 原生 auto-merge；待 build 状态检查通过且可合并时自动合入。
+            # mergeability 计算中可能处于 unstable 状态，故加重试。
+            for i in 1 2 3 4 5; do
+              if gh pr merge --auto --merge "$num"; then
+                echo "auto-merge enabled on PR #$num"
+                break
+              fi
+              echo "retry $i: auto-merge not ready yet, waiting..."
+              sleep 15
+            done
           done

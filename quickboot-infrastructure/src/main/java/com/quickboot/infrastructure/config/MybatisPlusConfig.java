@@ -4,14 +4,22 @@ import com.baomidou.mybatisplus.annotation.DbType;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
 import org.mybatis.spring.annotation.MapperScan;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * MyBatis-Plus 基础配置类。
+ * MyBatis-Plus 可插拔配置。
  *
- * <p>本类为常规 {@code @Configuration}，无条件装配注解——只要 infrastructure 模块
- * 在 classpath 上（mybatis-plus-boot-starter 为非 optional 依赖），本配置始终生效。</p>
+ * <p>通过 {@link ConditionalOnClass} + {@link ConditionalOnProperty} 双重条件
+ * 实现可插拔装配，与 Sa-Token、Redis 保持一致的设计风格：</p>
+ * <ul>
+ *   <li><b>classpath 条件</b>：仅当 MyBatis-Plus 核心类（{@code SqlSessionFactory}）
+ *       存在于 classpath 时才装配，字符串形式避免类加载失败。</li>
+ *   <li><b>属性开关</b>：仅当 {@code quickboot.mybatis-plus.enabled=true} 时才装配，
+ *       默认不启用（{@code matchIfMissing=false}），确保无数据库环境下不会尝试初始化。</li>
+ * </ul>
  *
  * <p>职责：</p>
  * <ul>
@@ -21,6 +29,8 @@ import org.springframework.context.annotation.Configuration;
  * </ul>
  */
 @Configuration
+@ConditionalOnClass(name = "org.apache.ibatis.session.SqlSessionFactory") // classpath 存在 MyBatis 核心类时才装配（字符串形式，避免类加载）
+@ConditionalOnProperty(prefix = "quickboot.mybatis-plus", name = "enabled", havingValue = "true", matchIfMissing = false) // quickboot.mybatis-plus.enabled=true 时才装配，默认不启用
 @MapperScan("com.quickboot.infrastructure.mapper") // 扫描 infrastructure 层的 Mapper 接口
 public class MybatisPlusConfig {
 

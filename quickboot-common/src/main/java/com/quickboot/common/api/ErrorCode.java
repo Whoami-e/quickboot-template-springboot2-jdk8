@@ -24,7 +24,11 @@ public enum ErrorCode implements IErrorCode, BaseEnum {
     /** 请求过于频繁（限流） */
     TOO_MANY_REQUESTS(429, "too many requests"),
     /** 服务不可用 */
-    SERVICE_UNAVAILABLE(503, "service unavailable");
+    SERVICE_UNAVAILABLE(503, "service unavailable"),
+    /** 用户不存在 */
+    USER_NOT_FOUND(1001, "用户不存在"),
+    /** 用户已存在 */
+    USER_ALREADY_EXISTS(1002, "用户已存在");
 
     /** 错误码 */
     private final Integer code;
