@@ -28,3 +28,6 @@ logs/
 
 # WorkBuddy workspace memory (not project source)
 .workbuddy/
+
+# Maven
+.mvn/
