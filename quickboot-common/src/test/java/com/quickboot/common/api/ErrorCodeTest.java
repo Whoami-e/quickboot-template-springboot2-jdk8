@@ -74,6 +74,20 @@ class ErrorCodeTest {
         assertThat(ErrorCode.SERVICE_UNAVAILABLE.getMessage()).isEqualTo("service unavailable");
     }
 
+    @Test
+    @DisplayName("USER_NOT_FOUND 枚举项 code=1001, message='用户不存在'")
+    void userNotFoundEnum() {
+        assertThat(ErrorCode.USER_NOT_FOUND.getCode()).isEqualTo(1001);
+        assertThat(ErrorCode.USER_NOT_FOUND.getMessage()).isEqualTo("用户不存在");
+    }
+
+    @Test
+    @DisplayName("USER_ALREADY_EXISTS 枚举项 code=1002, message='用户已存在'")
+    void userAlreadyExistsEnum() {
+        assertThat(ErrorCode.USER_ALREADY_EXISTS.getCode()).isEqualTo(1002);
+        assertThat(ErrorCode.USER_ALREADY_EXISTS.getMessage()).isEqualTo("用户已存在");
+    }
+
     @ParameterizedTest(name = "{0} 的 getDescription() 应与 getMessage() 一致")
     @EnumSource(ErrorCode.class)
     @DisplayName("所有枚举项 getDescription() 与 getMessage() 返回值一致")
@@ -96,8 +110,8 @@ class ErrorCodeTest {
     }
 
     @Test
-    @DisplayName("ErrorCode 共包含 8 个枚举项")
+    @DisplayName("ErrorCode 共包含 10 个枚举项")
     void enumCount() {
-        assertThat(ErrorCode.values()).hasSize(8);
+        assertThat(ErrorCode.values()).hasSize(10);
     }
 }
