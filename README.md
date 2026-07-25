@@ -102,7 +102,7 @@ QuickBoot 是一个基于 **Spring Boot 2.7.18 + JDK 8** 的多模块 Maven 脚�
 | 4 | 业务异常 + 全局异常处理 | `BusinessException` 配合 `GlobalExceptionHandler` 统一兜底 | ✅ 启用 |
 | 5 | 参数校验 | 基于 Bean Validation（`@Valid`、`@Min`、`@Max` 等） | ✅ 启用 |
 | 6 | 分页查询封装 | `BasePageRequest`（请求）+ `PageResponse`（响应） | ✅ 启用 |
-| 7 | MyBatis-Plus 集成 | 分页插件 + `@MapperScan` 自动扫描 Mapper | ✅ 启用 |
+| 7 | MyBatis-Plus 集成（可插拔） | 分页插件 + `@MapperScan` 自动扫描 Mapper，默认关闭，无数据库时回退内存模拟 | ⚪ 默认关闭 |
 | 8 | 代码生成器 | `CodeGenerator` 一键生成 Entity/Mapper/Service/Controller | ✅ 提供 |
 | 9 | Sa-Token 认证（可插拔） | 拦截器 + 专属异常处理，按需开启 | ⚪ 默认关闭 |
 | 10 | Redis 缓存（可插拔） | 自定义 `RedisTemplate` + 声明式缓存，按需开启 | ⚪ 默认关闭 |
@@ -124,9 +124,10 @@ QuickBoot 通过 `@ConditionalOnProperty` / `@ConditionalOnClass` 实现功能�
 | `quickboot.cors.enabled` | `true` | 跨域 CORS 配置（`CorsConfig`） | 设为 `false` 可关闭 |
 | `quickboot.trace.enabled` | `true` | 链路追踪 `TraceIdFilter`（MDC + 响应头） | 设为 `false` 可关闭 |
 | `quickboot.redis.enabled` | `false` | Redis 缓存（`RedisConfig`） | 引入依赖 + 设为 `true` + 配置 `spring.redis.host` |
+| `quickboot.mybatis-plus.enabled` | `false` | MyBatis-Plus ORM（`MybatisPlusConfig`） | 设为 `true` + 配置数据源 |
 | `quickboot.sa-token.enabled` | `false` | Sa-Token 鉴权（`SaTokenConfig` / `SaTokenExceptionHandler`） | 引入依赖 + 设为 `true` |
 
-> CORS 与 TraceId 默认开启，无需额外依赖即可使用；Redis 与 Sa-Token 默认关闭，**不引入依赖时不会报错**，启动零依赖。
+> CORS 与 TraceId 默认开启，无需额外依赖即可使用；Redis、Sa-Token 与 MyBatis-Plus 默认关闭，**不引入依赖或未配置数据源时不会报错**，启动零依赖。
 
 ---
 
@@ -189,6 +190,53 @@ spring:
 - 开启 `@EnableCaching`，`@Cacheable` / `@CacheEvict` 等注解生效。
 
 > 启动类已排除 `RedisAutoConfiguration`，因此未启用时即使引入依赖也不会自动连接 Redis。**不需要时保持默认即可，启动不会报错。**
+
+### MyBatis-Plus ORM
+
+MyBatis-Plus 默认关闭，`UserService` 在无数据库时自动回退到内存模拟模式，项目可零依赖启动。
+
+**启用方式**：在 `application.yml` 中开启开关并配置数据源，同时在 `quickboot-web/pom.xml` 中添加 MySQL 驱动依赖：
+
+```yaml
+quickboot:
+  mybatis-plus:
+    enabled: true
+
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/quickboot?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
+    username: root
+    password: your_password
+    driver-class-name: com.mysql.cj.jdbc.Driver
+```
+
+启用后：`MybatisPlusConfig` 装配分页插件与 `@MapperScan`，Service 自动切换为数据库模式。
+
+> 未启用时无需数据源，Service 使用内存 Map 模拟存储。**启动类已排除 `MybatisPlusAutoConfiguration`，未启用时不会尝试连接数据库。**
+
+### 新增实体开发指南（MyBatis-Plus 启用后）
+
+启用后新增数据库实体，按 DDD 分层依次创建以下文件：
+
+| 层 | 文件 | 包路径 | 要点 |
+|---|---|---|---|
+| **Domain** | `Order.java` | `domain.model` | 纯 POJO，不含持久化注解 |
+| **Entity** | `OrderEntity.java` | `infrastructure.entity` | 使用 `@TableName`、`@TableId`、`@TableLogic`、`@Version` 等 MyBatis-Plus 注解 |
+| **Mapper** | `OrderMapper.java` | `infrastructure.mapper` | 继承 `BaseMapper<T>` 获得单表 CRUD，加 `@Mapper` 注解 |
+| **Service** | `OrderService.java` | `application.service` | 注入 Mapper，负责 Entity ↔ Domain 转换，不暴露 Entity 到上层 |
+| **Controller** | `OrderController.java` | `web.controller` | 只调用 Service，统一返回 `ApiResponse<T>` |
+
+分层调用关系：`Controller → Service → Mapper(BaseMapper<T>)`
+
+```java
+// 示例：Mapper 继承 BaseMapper 即可获得 insert / selectById / updateById / deleteById / selectPage 等方法
+@Mapper
+public interface OrderMapper extends BaseMapper<OrderEntity> {
+    // 如需自定义 SQL，可添加 @Select / @Update 等注解方法
+}
+```
+
+> 项目内置了 [CodeGenerator](#代码生成器) 代码生成器，可根据数据库表一键生成上述全部分层代码，适合表结构已确定的场景。若需精细控制业务逻辑（如内存回退），建议手动创建。
 
 ---
 
@@ -306,9 +354,11 @@ environment:
 
 ## 代码生成器
 
-`CodeGenerator` 基于 MyBatis-Plus Generator + Velocity 模板，位于测试目录，不参与运行时打包。
+`CodeGenerator` 基于 MyBatis-Plus Generator + Velocity 模板，位于测试目录，不参与运行时打包。它的作用是根据数据库表结构，自动生成 Entity、Mapper、Service、Controller 等分层代码文件，避免手动编写重复的 CRUD 代码。
 
 **位置**：`quickboot-web/src/test/java/com/quickboot/web/generator/CodeGenerator.java`
+
+> **何时使用**：表结构已确定，需快速生成全套 CRUD 代码时使用。若项目未启用 MyBatis-Plus（默认关闭），或需要精细控制业务逻辑（如内存回退模式），可跳过本节，参考 [新增实体开发指南](#新增实体开发指南mybatis-plus-启用后) 手动创建。
 
 ### 使用步骤
 
@@ -342,7 +392,7 @@ resources/mapper
     └── UserMapper.xml           // Mapper XML（自定义 SQL）
 ```
 
-> 生成的代码默认输出到 web 模块的 `src/main/java`。多模块场景下，请按 DDD 分层将 Entity 输出到 domain、Mapper 输出到 infrastructure、Service 输出到 application、Controller 输出到 web。
+> 生成的代码默认输出到 web 模块的 `src/main/java`。多模块场景下，请按 DDD 分层将 Entity 与 Mapper 输出到 infrastructure、Service 输出到 application、Controller 输出到 web。
 
 ---
 
