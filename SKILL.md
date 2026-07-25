@@ -86,7 +86,7 @@ quickboot-common       ← 公共层（API 封装、异常、枚举、工具类�
 
 | 类名 | 职责 | 条件装配 |
 |------|------|----------|
-| `MybatisPlusConfig` | MyBatis-Plus 配置：`@MapperScan("com.quickboot.infrastructure.mapper")` + 分页拦截器 `PaginationInnerInterceptor`(MySQL 方言) | 无条件（始终生效） |
+| `MybatisPlusConfig` | MyBatis-Plus 可插拔配置：`@MapperScan("com.quickboot.infrastructure.mapper")` + 分页拦截器 `PaginationInnerInterceptor`(MySQL 方言) | `@ConditionalOnClass(name="...SqlSessionFactory")` + `@ConditionalOnProperty("quickboot.mybatis-plus.enabled=true", matchIfMissing=false)` |
 | `RedisConfig` | Redis 缓存配置：自定义 `RedisTemplate`(key=String, value=JSON)、`StringRedisTemplate`，`@EnableCaching` | `@ConditionalOnClass("RedisOperations")` + `@ConditionalOnProperty("quickboot.redis.enabled=true")` |
 | `SaTokenConfig` | Sa-Token 鉴权配置：注册 `SaInterceptor`，拦截 `/api/**`，放行 `/health`、`/actuator/**` | `@ConditionalOnClass("StpUtil")` + `@ConditionalOnProperty("quickboot.sa-token.enabled=true")` |
 
@@ -112,7 +112,7 @@ quickboot-common       ← 公共层（API 封装、异常、枚举、工具类�
 
 | 包 | 类名 | 职责 |
 |----|------|------|
-| (根) | `QuickbootApplication` | Spring Boot 启动类，`scanBasePackages = "com.quickboot"`，排除 `DataSourceAutoConfiguration`、`RedisAutoConfiguration`、`RedisRepositoriesAutoConfiguration` |
+| (根) | `QuickbootApplication` | Spring Boot 启动类，`scanBasePackages = "com.quickboot"`，排除 `DataSourceAutoConfiguration`、`MybatisPlusAutoConfiguration`、`RedisAutoConfiguration`、`RedisRepositoriesAutoConfiguration` |
 | `config` | `CorsConfig` | 跨域 CORS 配置（实现 `WebMvcConfigurer`），支持 `allowedOrigins`/`allowedMethods` 配置。`"*"` 时自动改用 `allowedOriginPatterns` 兼容凭证模式 | 
 | `config` | `JacksonConfig` | 全局 Jackson 序列化配置（`Jackson2ObjectMapperBuilderCustomizer`）：禁用时间戳、统一日期格式、Long→String、忽略 null、时区 Asia/Shanghai、忽略未知字段 |
 | `filter` | `TraceIdFilter` | MDC 链路追踪过滤器（`OncePerRequestFilter`），优先从 `X-Trace-Id` 请求头获取，否则生成 32 位 UUID，写入 MDC 并回写响应头 |
@@ -141,8 +141,9 @@ quickboot-common       ← 公共层（API 封装、异常、枚举、工具类�
 | 链路追踪 | `quickboot.trace.enabled` | `true` | `TraceIdFilter` | `@ConditionalOnProperty(matchIfMissing=true)` |
 | Redis 缓存 | `quickboot.redis.enabled` | `false` | `RedisConfig` | `@ConditionalOnClass` + `@ConditionalOnProperty` |
 | Sa-Token 鉴权 | `quickboot.sa-token.enabled` | `false` | `SaTokenConfig` + `SaTokenExceptionHandler` | `@ConditionalOnClass` + `@ConditionalOnProperty` |
+| MyBatis-Plus ORM | `quickboot.mybatis-plus.enabled` | `false` | `MybatisPlusConfig`（分页拦截器 + MapperScan） | `@ConditionalOnClass` + `@ConditionalOnProperty` + 主类排除 `MybatisPlusAutoConfiguration` |
 
-CORS 和 TraceId 默认开启（`matchIfMissing=true`），Redis 和 Sa-Token 默认关闭，需显式设为 `true` 且引入对应依赖后才会装配。
+CORS 和 TraceId 默认开启（`matchIfMissing=true`），Redis、Sa-Token 和 MyBatis-Plus 默认关闭，需显式设为 `true` 且满足 classpath 条件后才会装配。
 
 ## 可插拔功能说明
 
@@ -165,6 +166,15 @@ CORS 和 TraceId 默认开启（`matchIfMissing=true`），Redis 和 Sa-Token �
 
 **启用方式**：web 模块 pom 显式引入 `sa-token-spring-boot-starter`（去掉 optional）+ 配置 `quickboot.sa-token.enabled=true`
 
+### MyBatis-Plus 可插拔
+
+1. **条件装配层**：`MybatisPlusConfig` 使用 `@ConditionalOnClass(name="org.apache.ibatis.session.SqlSessionFactory")` + `@ConditionalOnProperty(prefix="quickboot.mybatis-plus", name="enabled", havingValue="true", matchIfMissing=false)` 双重条件守卫，仅当 classpath 存在 MyBatis 核心类且配置开关显式打开时才装配
+2. **主类排除**：`QuickbootApplication` 的 `@SpringBootApplication(exclude=...)` 中排除 `MybatisPlusAutoConfiguration`，避免未启用时 MyBatis-Plus 自动扫描 DataSource 导致初始化失败
+3. **服务层回退**：`UserService` 通过 `@Autowired(required=false)` 注入 `UserMapper`，当 Mapper 不可用时自动回退到内存 `ConcurrentHashMap` 模拟 CRUD，保证无数据库环境下服务仍可正常启动和演示
+4. **注意**：`mybatis-plus-boot-starter` 在 infrastructure 模块中**未声明为 optional**（与 Redis/Sa-Token 不同），因此 MyBatis-Plus 核心类始终存在于 classpath，`@ConditionalOnClass` 条件始终满足，实际控制装配的是 `@ConditionalOnProperty` 属性开关和主类排除
+
+**启用方式**：配置 `quickboot.mybatis-plus.enabled=true` + 添加 `spring.datasource` 数据源配置
+
 ## 配置文件
 
 ### 多环境配置
@@ -174,7 +184,7 @@ CORS 和 TraceId 默认开启（`matchIfMissing=true`），Redis 和 Sa-Token �
 | `application.yml` | (公共) | 端口 8080、默认 profile=dev、特性开关、Actuator 配置、Jackson 配置 |
 | `application-dev.yml` | dev | 懒加载 `lazy-initialization=true`、业务包日志 DEBUG |
 | `application-test.yml` | test | 业务包 INFO、框架包 WARN |
-| `application-prod.yml` | prod | 业务包 INFO、框架包 WARN（收敛日志量） |
+| `application-prod.yml` | prod | 业务包 INFO、框架包 WARN（收敛日志量）、MyBatis-Plus 开关显式声明 |
 
 通过 `spring.profiles.active` 切换环境，或通过环境变量 `SPRING_PROFILES_ACTIVE` 覆盖。
 
@@ -199,6 +209,8 @@ quickboot:
     enabled: false                 # Redis 缓存开关
   sa-token:
     enabled: false                 # Sa-Token 鉴权开关
+  mybatis-plus:
+    enabled: false                 # MyBatis-Plus ORM 开关（需配合数据源使用）
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
     time-zone: Asia/Shanghai
@@ -228,11 +240,12 @@ management:
 - `@ConditionalOnClass(name="...")` 使用**字符串形式**指定类名，通过 ASM 读取字节码判定，避免类加载触发 `NoClassDefFoundError`
 - `@ConditionalOnProperty` 通过配置开关控制运行时是否装配
 - `matchIfMissing=true` 用于默认开启的特性（CORS、TraceId）
+- MyBatis-Plus 额外依赖主类 `exclude MybatisPlusAutoConfiguration` 作为第三层守卫，防止未启用时自动装配初始化失败
 
 ### 2. 可插拔架构设计
 
 - optional 依赖阻断了传递性，下游模块需显式引入
-- 启动类排除 `DataSourceAutoConfiguration` / `RedisAutoConfiguration`，确保最小依赖可启动
+- 启动类排除 `DataSourceAutoConfiguration` / `MybatisPlusAutoConfiguration` / `RedisAutoConfiguration`，确保最小依赖可启动
 - `@Bean` 方法参数注入避免类字段类型解析
 
 ### 3. MDC 链路追踪
