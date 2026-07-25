@@ -1,0 +1,35 @@
+name: auto-merge
+
+# 当目标分支为 master 的 PR 其 CI 检查（build）跑完且成功时，
+# 由 GitHub 原生 Auto-merge 自动合入 master，无需手动操作。
+# 关键：必须在 build 检查“已完成”后开启 auto-merge，
+# 检查进行中（unstable）时开启会被 GitHub 拒绝。
+on:
+  check_run:
+    types: [completed]
+
+permissions:
+  pull-requests: write
+  contents: write
+
+jobs:
+  enable-auto-merge:
+    runs-on: ubuntu-latest
+    if: >-
+      github.event.check_run.name == 'build' &&
+      github.event.check_run.conclusion == 'success'
+    steps:
+      - name: Enable auto-merge for PRs targeting master
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          prs='${{ toJson(github.event.check_run.check_suite.pull_requests) }}'
+          for num in $(echo "$prs" | python3 -c "import sys,json; print(' '.join(str(p['number']) for p in json.load(sys.stdin)))"); do
+            base=$(gh pr view "$num" --json baseRefName -q .baseRefName)
+            if [ "$base" = "master" ]; then
+              echo "Enabling auto-merge on PR #$num (base=master)"
+              gh pr merge --auto --merge "$num" || echo "auto-merge already enabled or skipped"
+            else
+              echo "PR #$num targets $base, skip"
+            fi
+          done
