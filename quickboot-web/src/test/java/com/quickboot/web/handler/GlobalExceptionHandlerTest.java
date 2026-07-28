@@ -3,9 +3,15 @@ package com.quickboot.web.handler;
 import com.quickboot.common.api.ApiResponse;
 import com.quickboot.common.api.ErrorCode;
 import com.quickboot.common.exception.BusinessException;
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 
@@ -29,10 +35,22 @@ import static org.assertj.core.api.Assertions.assertThat;
 class GlobalExceptionHandlerTest {
 
     private GlobalExceptionHandler handler;
+    private ListAppender<ILoggingEvent> logAppender;
 
     @BeforeEach
     void setUp() {
+        Logger logger = (Logger) LoggerFactory.getLogger(GlobalExceptionHandler.class);
+        logAppender = new ListAppender<>();
+        logAppender.start();
+        logger.addAppender(logAppender);
+
         handler = new GlobalExceptionHandler();
+    }
+
+    @AfterEach
+    void tearDown() {
+        Logger logger = (Logger) LoggerFactory.getLogger(GlobalExceptionHandler.class);
+        logger.detachAppender(logAppender);
     }
 
     @Test
@@ -45,6 +63,8 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getCode()).isEqualTo(4001);
         assertThat(response.getMessage()).isEqualTo("用户不存在");
         assertThat(response.getData()).isNull();
+        assertThat(logAppender.list)
+                .anySatisfy(event -> assertThat(event.getLevel()).isEqualTo(Level.WARN));
     }
 
     @Test
@@ -56,6 +76,8 @@ class GlobalExceptionHandlerTest {
 
         assertThat(response.getCode()).isEqualTo(404);
         assertThat(response.getMessage()).isEqualTo("not found");
+        assertThat(logAppender.list)
+                .anySatisfy(event -> assertThat(event.getLevel()).isEqualTo(Level.WARN));
     }
 
     @Test
@@ -68,6 +90,8 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getCode()).isEqualTo(500);
         assertThat(response.getMessage()).isEqualTo("internal server error");
         assertThat(response.getData()).isNull();
+        assertThat(logAppender.list)
+                .anySatisfy(event -> assertThat(event.getLevel()).isEqualTo(Level.ERROR));
     }
 
     @Test
@@ -79,6 +103,8 @@ class GlobalExceptionHandlerTest {
 
         assertThat(response.getCode()).isEqualTo(404);
         assertThat(response.getMessage()).isEqualTo("not found");
+        assertThat(logAppender.list)
+                .anySatisfy(event -> assertThat(event.getLevel()).isEqualTo(Level.WARN));
     }
 
     @Test
@@ -91,6 +117,8 @@ class GlobalExceptionHandlerTest {
 
         assertThat(response.getCode()).isEqualTo(400);
         assertThat(response.getMessage()).isEqualTo("bad request");
+        assertThat(logAppender.list)
+                .anySatisfy(event -> assertThat(event.getLevel()).isEqualTo(Level.WARN));
     }
 
     @Test
@@ -105,5 +133,7 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getCode()).isEqualTo(400);
         assertThat(response.getMessage()).isEqualTo(ex.getMessage());
         assertThat(response.getData()).isNull();
+        assertThat(logAppender.list)
+                .anySatisfy(event -> assertThat(event.getLevel()).isEqualTo(Level.WARN));
     }
 }

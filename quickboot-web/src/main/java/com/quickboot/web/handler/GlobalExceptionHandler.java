@@ -32,6 +32,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(BusinessException.class)
     public ApiResponse<Void> handleBusinessException(BusinessException ex) {
+        log.warn("Business exception: code={}, message={}", ex.getCode(), ex.getMessage());
         return ApiResponse.fail(ex.getCode(), ex.getMessage());
     }
 
@@ -44,6 +45,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler({MethodArgumentNotValidException.class, BindException.class})
     public ApiResponse<Void> handleValidationException(Exception ex) {
+        log.warn("Validation failed: {}", ex.getMessage());
         return ApiResponse.fail(ErrorCode.BAD_REQUEST.getCode(), ex.getMessage());
     }
 
@@ -55,6 +57,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(NoHandlerFoundException.class)
     public ApiResponse<Void> handleNoHandlerFound(NoHandlerFoundException ex) {
+        log.warn("No handler found: {} {}", ex.getHttpMethod(), ex.getRequestURL());
         return ApiResponse.fail(ErrorCode.NOT_FOUND.getCode(), ErrorCode.NOT_FOUND.getMessage());
     }
 
@@ -66,6 +69,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ApiResponse<Void> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
+        log.warn("Method not supported: {}", ex.getMethod());
         return ApiResponse.fail(ErrorCode.BAD_REQUEST.getCode(), ErrorCode.BAD_REQUEST.getMessage());
     }
 
